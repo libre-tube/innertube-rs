@@ -1,7 +1,10 @@
 [package]
 name = "innertube"
 version = "0.1.0"
+authors = ["unixource <unixource@tuta.io>"]
 edition = "2024"
+description = "Channel & video metadata parsing library from YouTube"
+license = "MIT"
 
 [dependencies]
 eyre = "0.6.14"
