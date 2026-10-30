@@ -1,33 +1,6 @@
 use serde::Deserialize;
 use serde_with::{DisplayFromStr, serde_as};
 
-// "metadata": {
-//     "channelMetadataRenderer": {
-//         "title": "Asd Dsa",
-//         "description": "",
-//         "rssUrl": "https://www.youtube.com/feeds/videos.xml?channel_id=UCCOXbb-KWEx0OZTMt67iJaw",
-//         "externalId": "UCCOXbb-KWEx0OZTMt67iJaw",
-//         "keywords": "",
-//         "ownerUrls": [
-//             "http://www.youtube.com/@AsdDsa-j1v8r"
-//         ],
-//         "avatar": {
-//             "thumbnails": [
-//                 {
-//                     "url": "https://yt3.googleusercontent.com/ytc/AIdro_nATaj_XyZ449yTpyY9GNkkpedOEjet8B9ru95ikqwS3Mf-MXvcS1UlV0t6a5VEu6AwMQ=s900-c-k-c0x00ffffff-no-rj",
-//                     "width": 900,
-//                     "height": 900
-//                 }
-//             ]
-//         },
-//         "channelUrl": "https://www.youtube.com/channel/UCCOXbb-KWEx0OZTMt67iJaw",
-//         "isFamilySafe": true,
-//         "availableCountryCodes": [
-// //   "androidDeepLink": "android-app://com.google.android.youtube/http/www.youtube.com/channel/UCCOXbb-KWEx0OZTMt67iJaw",
-//         "androidAppindexingLink": "android-app://com.google.android.youtube/http/www.youtube.com/channel/UCCOXbb-KWEx0OZTMt67iJaw",
-//         "iosAppindexingLink": "ios-app://544007664/vnd.youtube/www.youtube.com/channel/UCCOXbb-KWEx0OZTMt67iJaw",
-//         "vanityChannelUrl": "http://www.youtube.com/@AsdDsa-j1v8r"
-
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChannelMetadata {
@@ -37,9 +10,14 @@ pub struct ChannelMetadata {
     pub external_id: String,
     pub keywords: String,
     pub owner_urls: Vec<String>,
-    // avatar: TODO
+    pub avatar: Thumbnails,
     pub channel_url: String,
     pub is_family_safe: bool,
+    pub available_countries: Option<Countries>,
+    pub android_deep_link: String,
+    pub android_appindexing_link: String,
+    pub ios_appindexing_link: String,
+    pub vanity_channel_url: String,
 }
 
 #[serde_as]
@@ -61,5 +39,20 @@ pub struct VideoMetadata {
     pub is_unplugged_corpus: bool,
     pub is_live_content: bool,
     pub is_tvfilm_video: bool,
-    //thumbnail: TODO,
+    pub thumbnail: Thumbnails,
+    pub available_countries: Option<Countries>,
 }
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Thumbnail {
+    pub url: String,
+    pub width: usize,
+    pub height: usize,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Thumbnails {
+    pub thumbnails: Vec<Thumbnail>,
+}
+
+pub type Countries = Vec<String>;

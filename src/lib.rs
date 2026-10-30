@@ -1,6 +1,5 @@
-use std::io::Read;
-
-use eyre::ContextCompat;
+use eyre::{ContextCompat, eyre};
+use isahc::AsyncReadResponseExt;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
@@ -30,34 +29,34 @@ pub struct Innertube {
 }
 
 impl Innertube {
-    fn req<D: DeserializeOwned>(
+    async fn req<D: DeserializeOwned>(
         &self,
         url: &str,
         mut payload: serde_json::Value,
         get: &'static str,
     ) -> eyre::Result<D> {
-        let mut buf = String::new();
         let mut json = serde_json::from_str::<serde_json::Value>(CONTEXT_DEFAULT).unwrap();
         json.as_object_mut()
             .unwrap()
             .append(payload.as_object_mut().unwrap());
 
-        self.client
-            .post(url, json.to_string())?
-            .into_body()
-            .read_to_string(&mut buf)?;
+        let mut resp = self.client.post_async(url, json.to_string()).await?;
+        let text = resp.text().await?;
 
-        let buf_parsed: Value = serde_json::from_str(&buf)?;
-        Ok(serde_json::from_value(
-            get.split(".")
-                .try_fold(&buf_parsed, |value, key| {
-                    value
-                        .get(key)
-                        .context(eyre::eyre!("key `{key}` was not found"))
-                })?
-                .to_owned(),
-        )?)
+        if resp.status().is_success() {
+            let buf_parsed: Value = serde_json::from_str(&text)?;
+            Ok(serde_json::from_value(
+                get.split(".")
+                    .try_fold(&buf_parsed, |value, key| {
+                        value.get(key).context(eyre!("key `{key}` was not found"))
+                    })?
+                    .to_owned(),
+            )?)
+        } else {
+            Err(eyre!("http error {}: {text}", resp.status()))
+        }
     }
+
     pub fn new() -> eyre::Result<Self> {
         let client = isahc::HttpClient::builder()
             .cookies()
@@ -72,19 +71,21 @@ impl Innertube {
         Ok(Innertube { client })
     }
 
-    pub fn channel_metadata(&self, channel_id: &str) -> eyre::Result<ChannelMetadata> {
+    pub async fn channel_metadata(&self, channel_id: &str) -> eyre::Result<ChannelMetadata> {
         self.req(
             YT_BROWSE_ENDPOINT,
             json!({ "browseId": channel_id }),
             "metadata.channelMetadataRenderer",
         )
+        .await
     }
 
-    pub fn video_metadata(&self, video_id: &str) -> eyre::Result<VideoMetadata> {
+    pub async fn video_metadata(&self, video_id: &str) -> eyre::Result<VideoMetadata> {
         self.req(
             YT_PLAYER_ENDPOINT,
             json!({ "videoId": video_id }),
             "videoDetails",
         )
+        .await
     }
 }
