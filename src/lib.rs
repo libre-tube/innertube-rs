@@ -3,11 +3,11 @@ use isahc::AsyncReadResponseExt;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
-pub const YT_URL: &str = "https://www.youtube.com";
-pub const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36";
-pub const CONTENT_TYPE: &str = "application/json";
+const YT_URL: &str = "https://www.youtube.com";
+const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36";
+const CONTENT_TYPE: &str = "application/json";
 
-pub const CONTEXT_DEFAULT: &str = r#"
+const CONTEXT_DEFAULT: &str = r#"
     {
         "context": {
             "client": {
@@ -18,14 +18,15 @@ pub const CONTEXT_DEFAULT: &str = r#"
     }
 "#;
 
-pub const YT_BROWSE_ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/browse";
-pub const YT_PLAYER_ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/player";
+const YT_BROWSE_ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/browse";
+const YT_PLAYER_ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/player";
 
-pub mod types;
-use types::*;
+mod types;
+pub use types::*;
 
+/// The Innertube client used to access YouTube’s API
 pub struct Innertube {
-    pub client: isahc::HttpClient,
+    client: isahc::HttpClient,
 }
 
 impl Innertube {
@@ -57,6 +58,7 @@ impl Innertube {
         }
     }
 
+    /// Create a new Innertube instance
     pub fn new() -> eyre::Result<Self> {
         let client = isahc::HttpClient::builder()
             .cookies()
@@ -71,6 +73,7 @@ impl Innertube {
         Ok(Innertube { client })
     }
 
+    /// Get channel metadata with specified `channel_id`
     pub async fn channel_metadata(&self, channel_id: &str) -> eyre::Result<ChannelMetadata> {
         self.req(
             YT_BROWSE_ENDPOINT,
@@ -80,6 +83,7 @@ impl Innertube {
         .await
     }
 
+    /// Get video metadata with specified `video_id`
     pub async fn video_metadata(&self, video_id: &str) -> eyre::Result<VideoMetadata> {
         self.req(
             YT_PLAYER_ENDPOINT,

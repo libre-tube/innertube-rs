@@ -3,6 +3,7 @@ use serde_with::{DisplayFromStr, serde_as};
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+/// YouTube channel metadata object
 pub struct ChannelMetadata {
     pub title: String,
     pub description: String,
@@ -23,6 +24,7 @@ pub struct ChannelMetadata {
 #[serde_as]
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+/// YouTube video metadata object
 pub struct VideoMetadata {
     pub video_id: String,
     pub title: String,
@@ -44,6 +46,7 @@ pub struct VideoMetadata {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+/// Used in deserialization of video thumbnail or avatar
 pub struct Thumbnail {
     pub url: String,
     pub width: usize,
@@ -51,8 +54,10 @@ pub struct Thumbnail {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+/// Stores video thumbnail / avatar variants in different resolutions
 pub struct Thumbnails {
     pub thumbnails: Vec<Thumbnail>,
 }
 
+/// List of countries in `ISO 639-1` format
 pub type Countries = Vec<String>;
