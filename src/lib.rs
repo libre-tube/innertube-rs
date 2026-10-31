@@ -1,7 +1,9 @@
-use eyre::{ContextCompat, eyre};
+// use eyre::{ContextCompat, eyre};
 use isahc::AsyncReadResponseExt;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
+
+pub use isahc::http::StatusCode;
 
 const YT_URL: &str = "https://www.youtube.com";
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36";
@@ -24,6 +26,25 @@ const YT_PLAYER_ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/player";
 mod types;
 pub use types::*;
 
+#[derive(thiserror::Error, Debug)]
+pub enum InnertubeError {
+    #[error("http error ({status_code}): {context}")]
+    Http {
+        status_code: StatusCode,
+        context: String,
+    },
+    #[error("key `{0}` was not found")]
+    KeyNotFound(String),
+    #[error("isahc error: {0}")]
+    Isahc(#[from] isahc::Error),
+    #[error("io error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("failed to deserialize json: {0}")]
+    Json(#[from] serde_json::Error),
+}
+
+type InnertubeResult<T> = Result<T, InnertubeError>;
+
 /// The Innertube client used to access YouTube’s API
 pub struct Innertube {
     client: isahc::HttpClient,
@@ -35,7 +56,7 @@ impl Innertube {
         url: &str,
         mut payload: serde_json::Value,
         get: &'static str,
-    ) -> eyre::Result<D> {
+    ) -> InnertubeResult<D> {
         let mut json = serde_json::from_str::<serde_json::Value>(CONTEXT_DEFAULT).unwrap();
         json.as_object_mut()
             .unwrap()
@@ -49,17 +70,22 @@ impl Innertube {
             Ok(serde_json::from_value(
                 get.split(".")
                     .try_fold(&buf_parsed, |value, key| {
-                        value.get(key).context(eyre!("key `{key}` was not found"))
+                        value
+                            .get(key)
+                            .ok_or(InnertubeError::KeyNotFound(key.to_string()))
                     })?
                     .to_owned(),
             )?)
         } else {
-            Err(eyre!("http error {}: {text}", resp.status()))
+            Err(InnertubeError::Http {
+                status_code: resp.status(),
+                context: text,
+            })
         }
     }
 
     /// Create a new Innertube instance
-    pub fn new() -> eyre::Result<Self> {
+    pub fn new() -> InnertubeResult<Self> {
         let client = isahc::HttpClient::builder()
             .cookies()
             .default_header("User-Agent", USER_AGENT)
@@ -74,7 +100,7 @@ impl Innertube {
     }
 
     /// Get channel metadata with specified `channel_id`
-    pub async fn channel_metadata(&self, channel_id: &str) -> eyre::Result<ChannelMetadata> {
+    pub async fn channel_metadata(&self, channel_id: &str) -> InnertubeResult<ChannelMetadata> {
         self.req(
             YT_BROWSE_ENDPOINT,
             json!({ "browseId": channel_id }),
@@ -84,7 +110,7 @@ impl Innertube {
     }
 
     /// Get video metadata with specified `video_id`
-    pub async fn video_metadata(&self, video_id: &str) -> eyre::Result<VideoMetadata> {
+    pub async fn video_metadata(&self, video_id: &str) -> InnertubeResult<VideoMetadata> {
         self.req(
             YT_PLAYER_ENDPOINT,
             json!({ "videoId": video_id }),
