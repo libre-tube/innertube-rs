@@ -1,5 +1,8 @@
+use std::io::Read;
+
 // use eyre::{ContextCompat, eyre};
 use isahc::AsyncReadResponseExt;
+use regex::regex;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
@@ -22,6 +25,8 @@ const CONTEXT_DEFAULT: &str = r#"
 
 const YT_BROWSE_ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/browse";
 const YT_PLAYER_ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/player";
+
+const BUFFER_LENGTH: usize = 1024 * 256;
 
 mod types;
 pub use types::*;
@@ -82,6 +87,28 @@ impl Innertube {
                 context: text,
             })
         }
+    }
+
+    pub fn fetch_browse_id(&self, url: &str) -> InnertubeResult<Option<String>> {
+        let mut buf = [0; BUFFER_LENGTH];
+        let mut text = String::new();
+        let mut resp = isahc::get(url)?.into_body();
+        while resp.read_exact(&mut buf).is_ok() {
+            text.push_str(&String::from_utf8_lossy(&buf));
+
+            if let Some(match_) = regex!(r#""browseId":+"(?:[^"]|"")*""#).find(&text) {
+                let (_, browse_id) = match_.as_str().split_once(":").unwrap();
+                return Ok(Some(
+                    browse_id
+                        .trim()
+                        .trim_start_matches('"')
+                        .trim_end_matches('"')
+                        .to_string(),
+                ));
+            }
+        }
+
+        Ok(None)
     }
 
     /// Create a new Innertube instance

@@ -692,6 +692,7 @@ dependencies = [
  "isahc",
  "log",
  "pretty_env_logger",
+ "regex",
  "serde",
  "serde_json",
  "serde_with",
