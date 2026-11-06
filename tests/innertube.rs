@@ -30,26 +30,15 @@ async fn video_metadata() {
     assert_eq!(&metadata.author, "Rick Astley");
 }
 
-#[test]
-fn browse_id_fetch() {
-    // assert_eq!(
-    //     INNERTUBE
-    //         .fetch_browse_id(
-    //             "https://www.youtube.com/playlist?list=PLkahZjV5wKe8w9GC_n2yyhx6Wj-NKzzeE"
-    //         )
-    //         .unwrap(),
-    //     Some("VLPLDIoUOhQQPlXzhp-83rECoLaV6BwFtNC4".to_string())
-    // );
-    // assert_eq!(
-    //     INNERTUBE
-    //         .fetch_browse_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-    //         .unwrap(),
-    //     Some("dQw4w9WgXcQ".to_string())
-    // );
+#[tokio::test]
+async fn playlist_metadata() {
+    let metadata = INNERTUBE
+        .playlist_metadata("PLFPk5ONFpYvWsnAYJqm6Li4qtg367uUbv")
+        .await
+        .unwrap();
     assert_eq!(
-        INNERTUBE
-            .fetch_browse_id("https://www.youtube.com/@veritasium")
-            .unwrap(),
-        Some("UCHnyfMqiRRG1u-2MsSQLbXA".to_string())
+        &metadata.title,
+        "Rickroll Playlist(Never Gonna Give you Up)"
     );
+    assert_eq!(metadata.videos_count, 571);
 }

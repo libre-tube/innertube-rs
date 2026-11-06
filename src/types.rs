@@ -46,6 +46,17 @@ pub struct VideoMetadata {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+/// YouTube playlist metadata object
+pub struct PlaylistMetadata {
+    pub title: String,
+    pub videos_count: usize,
+    pub views_count: usize,
+    pub android_appindexing_link: String,
+    pub ios_appindexing_link: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 /// Used in deserialization of video thumbnail or avatar
 pub struct Thumbnail {
     pub url: String,
