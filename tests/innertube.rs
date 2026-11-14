@@ -40,6 +40,10 @@ async fn playlist_metadata() {
         &metadata.title,
         "Rickroll Playlist(Never Gonna Give you Up)"
     );
+    assert_eq!(
+        metadata.description,
+        Some("Rick Astley \"Never Gonna give you Up\" Remixes".to_string())
+    );
     assert_eq!(metadata.videos_count, 571);
 }
 

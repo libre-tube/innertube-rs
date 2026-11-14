@@ -50,6 +50,8 @@ pub struct VideoMetadata {
 /// YouTube playlist metadata object
 pub struct PlaylistMetadata {
     pub title: String,
+    pub description: Option<String>,
+    pub thumbnail: Thumbnails,
     pub videos_count: usize,
     pub views_count: usize,
     pub android_appindexing_link: String,

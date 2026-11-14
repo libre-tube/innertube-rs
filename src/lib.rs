@@ -132,16 +132,18 @@ impl Innertube {
 
     /// Get video metadata with specified `playlist_id`
     pub async fn playlist_metadata(&self, playlist_id: &str) -> InnertubeResult<PlaylistMetadata> {
-        let [mut playlist_metadata, additional_info] = self
+        let [mut playlist_metadata, additional_info, thumbnail] = self
             .req(
                 YT_BROWSE_ENDPOINT,
                 json!({ "browseId": String::from("VL")+playlist_id}),
                 &[
                     "metadata.playlistMetadataRenderer",
                     "header.pageHeaderRenderer.content.pageHeaderViewModel.metadata.contentMetadataViewModel.metadataRows.1.metadataParts",
+                    "contents.twoColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.contents.0.itemSectionRenderer.contents.0.lockupViewModel.contentImage.thumbnailViewModel.image.sources"
                 ],
             )
             .await?;
+
         let mut additional_info = additional_info.as_array().unwrap().iter().map(|value| {
             tools::json("text.content", value)
                 .unwrap()
@@ -163,8 +165,13 @@ impl Innertube {
             .collect::<Vec<usize>>()
             .try_into()
             .unwrap();
+
         tools::append(
             &mut json!({"videosCount": videos_count, "viewsCount": views_count}),
+            &mut playlist_metadata,
+        );
+        tools::append(
+            &mut json!({"thumbnail": {"thumbnails": thumbnail}}),
             &mut playlist_metadata,
         );
 
