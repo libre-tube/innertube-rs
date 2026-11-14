@@ -28,6 +28,11 @@ async fn video_metadata() {
     );
     assert_eq!(metadata.length_seconds, 213);
     assert_eq!(&metadata.author, "Rick Astley");
+    assert_eq!(
+        metadata.thumbnail.max_resolution().url,
+        "https://i.ytimg.com/vi_webp/dQw4w9WgXcQ/maxresdefault.webp".to_string()
+    );
+    assert_eq!(metadata.thumbnail.min_resolution().url, "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg?sqp=-oaymwEbCKgBEF5IVfKriqkDDggBFQAAiEIYAXABwAEG&rs=AOn4CLDd2KtelLHaNSXrI9_5K-NvTscKNw".to_string());
 }
 
 #[tokio::test]
@@ -45,6 +50,8 @@ async fn playlist_metadata() {
         Some("Rick Astley \"Never Gonna give you Up\" Remixes".to_string())
     );
     assert_eq!(metadata.videos_count, 571);
+    assert_eq!(metadata.thumbnail.max_resolution().url, "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg?sqp=-oaymwEcCNACELwBSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLB_p0PncTtkrhaNDZtntrE3gKkoYw".to_string());
+    assert_eq!(metadata.thumbnail.min_resolution().url, "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg?sqp=-oaymwEbCKgBEF5IVfKriqkDDggBFQAAiEIYAXABwAEG&rs=AOn4CLDd2KtelLHaNSXrI9_5K-NvTscKNw".to_string());
 }
 
 #[tokio::test]

@@ -12,7 +12,8 @@ pub fn json(path: &'static str, json: &Value) -> Result<Value, InnertubeError> {
             }
             .ok_or(())
         })
-        .map_err(|_| InnertubeError::NotFoundInJSON(vec![path.to_string()])).map(|v| v.to_owned())
+        .map_err(|_| InnertubeError::NotFoundInJSON(vec![path.to_string()]))
+        .map(|v| v.to_owned())
 }
 
 /// Connects two `Value`

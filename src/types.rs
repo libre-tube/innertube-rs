@@ -72,5 +72,23 @@ pub struct Thumbnails {
     pub thumbnails: Vec<Thumbnail>,
 }
 
+impl Thumbnails {
+    /// Gets thumbnail with the minimum resolution
+    pub fn min_resolution(&self) -> Thumbnail {
+        let mut thumbnails = self.thumbnails.clone();
+        thumbnails.sort_by_key(|thumbnail| thumbnail.width * thumbnail.height);
+
+        thumbnails.remove(0)
+    }
+
+    /// Gets thumbnail with the maximum resolution
+    pub fn max_resolution(&self) -> Thumbnail {
+        let mut thumbnails = self.thumbnails.clone();
+        thumbnails.sort_by_key(|thumbnail| thumbnail.width * thumbnail.height);
+
+        thumbnails.pop().unwrap()
+    }
+}
+
 /// List of countries in `ISO 639-1` format
 pub type Countries = Vec<String>;
