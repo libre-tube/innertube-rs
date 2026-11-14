@@ -155,13 +155,12 @@ impl Innertube {
         // e.g. ["Playlist", "102 videos", "100,102 views"] -> [102_usize, 100102_usize]
         let [videos_count, views_count] = ["video", "view"]
             .iter()
-            .map(|pat| {
+            .filter_map(|pat| {
                 additional_info.find(|x| x.contains(pat)).and_then(|raw| {
                     raw.split_once(" ")
                         .and_then(|split| split.0.replace(',', "").parse::<usize>().ok())
                 })
             })
-            .flatten()
             .collect::<Vec<usize>>()
             .try_into()
             .unwrap();
