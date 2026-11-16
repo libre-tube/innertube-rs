@@ -55,7 +55,7 @@ async fn playlist_metadata() {
         metadata.description,
         Some("Rick Astley \"Never Gonna give you Up\" Remixes".to_string())
     );
-    assert_eq!(metadata.videos_count, 571);
+    assert_eq!(metadata.video_count, 571);
     assert!(
         metadata
             .thumbnail

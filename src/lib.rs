@@ -153,7 +153,7 @@ impl Innertube {
         });
 
         // e.g. ["Playlist", "102 videos", "100,102 views"] -> [102_usize, 100102_usize]
-        let [videos_count, views_count] = ["video", "view"]
+        let [video_count, view_count] = ["video", "view"]
             .iter()
             .filter_map(|pat| {
                 additional_info.find(|x| x.contains(pat)).and_then(|raw| {
@@ -166,7 +166,7 @@ impl Innertube {
             .unwrap();
 
         tools::append(
-            &mut json!({"videosCount": videos_count, "viewsCount": views_count}),
+            &mut json!({"videoCount": video_count, "viewCount": view_count}),
             &mut playlist_metadata,
         );
         tools::append(

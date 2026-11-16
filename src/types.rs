@@ -52,8 +52,8 @@ pub struct PlaylistMetadata {
     pub title: String,
     pub description: Option<String>,
     pub thumbnail: Thumbnails,
-    pub videos_count: usize,
-    pub views_count: usize,
+    pub video_count: usize,
+    pub view_count: usize,
     pub android_appindexing_link: String,
     pub ios_appindexing_link: String,
 }
