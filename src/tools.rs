@@ -5,6 +5,7 @@ use serde_json::Value;
 pub fn json(path: &'static str, json: &Value) -> Result<Value, InnertubeError> {
     path.split(".")
         .try_fold(json, |value, key| {
+            dbg!(key);
             if key.chars().all(|ch| ch.is_ascii_digit()) {
                 value.get(key.parse::<usize>().unwrap())
             } else {

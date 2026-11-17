@@ -5,6 +5,36 @@ use innertube::Innertube;
 const INNERTUBE: LazyLock<Innertube> = LazyLock::new(|| Innertube::new().unwrap());
 
 #[tokio::test]
+async fn channel_title() {
+    assert_eq!(
+        &INNERTUBE
+            .channel_title("UCBR8-60-B28hp2BmDPdntcQ")
+            .await
+            .unwrap(),
+        "YouTube"
+    );
+}
+
+#[tokio::test]
+async fn video_title() {
+    assert_eq!(
+        &INNERTUBE.video_title("dQw4w9WgXcQ").await.unwrap(),
+        "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)"
+    );
+}
+
+#[tokio::test]
+async fn playlist_title() {
+    assert_eq!(
+        &INNERTUBE
+            .playlist_title("PLTTUULw3bjATzc86JscVaBHy-O_d_1Ibh")
+            .await
+            .unwrap(),
+        "Installing Arch Linux every day until I find a girlfriend"
+    );
+}
+
+#[tokio::test]
 async fn channel_metadata() {
     let metadata = INNERTUBE
         .channel_metadata("UCBR8-60-B28hp2BmDPdntcQ")
@@ -81,6 +111,7 @@ async fn video_metadata_multiple() {
         "5MIsMbFjvkw",
         "aoag03mSuXQ",
     ] {
+        INNERTUBE.video_title(video_id).await.unwrap();
         INNERTUBE.video_metadata(video_id).await.unwrap();
     }
 }
@@ -94,6 +125,7 @@ async fn channel_metadata_multiple() {
         "UCEbYhDd6c6vngsF5PQpFVWg",
         "UCHnyfMqiRRG1u-2MsSQLbXA",
     ] {
+        INNERTUBE.channel_title(channel_id).await.unwrap();
         INNERTUBE.channel_metadata(channel_id).await.unwrap();
     }
 }
@@ -106,6 +138,7 @@ async fn playlist_metadata_multiple() {
         "PLTTUULw3bjATzc86JscVaBHy-O_d_1Ibh",
         "PLu94B0pepV1O78Yi_wlOm3-H-cJxROWVf",
     ] {
+        INNERTUBE.playlist_title(playlist_id).await.unwrap();
         INNERTUBE.playlist_metadata(playlist_id).await.unwrap();
     }
 }

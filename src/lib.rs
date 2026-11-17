@@ -1,6 +1,6 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, str::FromStr};
 
-// use eyre::{ContextCompat, eyre};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use isahc::AsyncReadResponseExt;
 use itertools::Itertools;
 use serde::de::DeserializeOwned;
@@ -25,6 +25,7 @@ const CONTEXT_DEFAULT: &str = r#"
 const YT_CONSENT_URL: &str = "https://consent.youtube.com/save?continue=https://www.youtube.com/&gl=US&m=0&pc=yt&x=5&src=2&hl=en&bl=0&cm=2&set_eom=false&set_apyt=true&set_ytc=true";
 const YT_BROWSE_ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/browse";
 const YT_PLAYER_ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/player";
+const YT_SHARE_ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/share/get_share_panel";
 
 mod tools;
 mod types;
@@ -64,15 +65,17 @@ impl Innertube {
         let mut json = serde_json::from_str::<serde_json::Value>(CONTEXT_DEFAULT).unwrap();
         tools::append(&mut payload, &mut json);
 
-        let mut resp = self.client.post_async(url, json.to_string()).await?;
+        let mut resp = self.client.post_async(url, dbg!(json.to_string())).await?;
         let text = resp.text().await?;
 
         if resp.status().is_success() {
             let buf_parsed: Value = serde_json::from_str(&text)?;
+
             let (successes, failures): (Vec<Value>, Vec<String>) = get
                 .iter()
                 .map(|path| tools::json(path, &buf_parsed).map_err(|_| path.to_string()))
                 .partition_result();
+
             if failures.is_empty() {
                 Ok(successes.try_into().unwrap_or_else(|_| panic!()))
             } else {
@@ -94,6 +97,50 @@ impl Innertube {
     ) -> InnertubeResult<D> {
         let [value] = self.req::<[Value; 1]>(url, payload, &[get]).await?;
         Ok(serde_json::from_value(value)?)
+    }
+
+    async fn get_title_from_share(
+        &self,
+        protobuf_raw: &[u8],
+        value: &str,
+    ) -> InnertubeResult<String> {
+        let protobuf_with_value = protobuf_raw.iter().fold(Vec::new(), |mut acc, ch| {
+            acc.append(&mut {
+                match *ch {
+                    b'V' => value.as_bytes().to_vec(),
+                    b'?' => vec![value.chars().count() as u8],
+                    ch => vec![ch],
+                }
+            });
+            acc
+        });
+
+        let social_networks = self
+            .req_single::<Vec<Value>>(
+                YT_SHARE_ENDPOINT,
+                json!({ "serializedSharedEntity": urlencoding::encode(&STANDARD.encode(protobuf_with_value)) }),
+                "actions.0.openPopupAction.popup.unifiedSharePanelRenderer.contents.0.thirdPartyNetworkSection.shareTargetContainer.thirdPartyShareTargetSectionRenderer.shareTargets",
+            )
+            .await?;
+
+        for entry in social_networks {
+            let Some(url) = tools::json(
+                "shareTargetRenderer.navigationEndpoint.urlEndpoint.url",
+                &entry,
+            )
+            .ok()
+            .and_then(|v| v.as_str().and_then(|s| url::Url::from_str(s).ok())) else {
+                continue;
+            };
+
+            if let Some((_, title)) = url.query_pairs().find(|(k, _)| k == "title") {
+                return Ok(title.to_string());
+            }
+        }
+
+        Err(InnertubeError::NotFoundInJSON(vec![
+            "share url that contains the `title` parameter".to_string(),
+        ]))
     }
 
     /// Create a new Innertube instance
@@ -120,6 +167,11 @@ impl Innertube {
         .await
     }
 
+    /// Get channel title with specified `channel_id` (way faster than `channel_metadata`)
+    pub async fn channel_title(&self, channel_id: &str) -> InnertubeResult<String> {
+        self.get_title_from_share(b"\x1a?V", channel_id).await
+    }
+
     /// Get video metadata with specified `video_id`
     pub async fn video_metadata(&self, video_id: &str) -> InnertubeResult<VideoMetadata> {
         self.req_single(
@@ -128,6 +180,12 @@ impl Innertube {
             "videoDetails",
         )
         .await
+    }
+
+    /// Get channel title with specified `video_id` (way faster than `video_metadata`)
+    pub async fn video_title(&self, video_id: &str) -> InnertubeResult<String> {
+        self.get_title_from_share(b"\n?V\xa0\x01\x01", video_id)
+            .await
     }
 
     /// Get video metadata with specified `playlist_id`
@@ -175,5 +233,10 @@ impl Innertube {
         );
 
         Ok(serde_json::from_value(playlist_metadata.to_owned())?)
+    }
+
+    /// Get playlist title with specified `playlist_id` (way faster than `playlist_metadata`)
+    pub async fn playlist_title(&self, playlist_id: &str) -> InnertubeResult<String> {
+        self.get_title_from_share(b"\x12?V", playlist_id).await
     }
 }
