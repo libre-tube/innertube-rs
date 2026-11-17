@@ -65,7 +65,7 @@ impl Innertube {
         let mut json = serde_json::from_str::<serde_json::Value>(CONTEXT_DEFAULT).unwrap();
         tools::append(&mut payload, &mut json);
 
-        let mut resp = self.client.post_async(url, dbg!(json.to_string())).await?;
+        let mut resp = self.client.post_async(url, json.to_string()).await?;
         let text = resp.text().await?;
 
         if resp.status().is_success() {
