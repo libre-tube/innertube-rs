@@ -4,7 +4,8 @@ Metadata parsing library from YouTube. Currently supports `Channel`, `Video`,`Pl
 # Getting started
 ```rust
 let innertube = Innertube::new().unwrap();
-innertube.chanel("UCBR8-60-B28hp2BmDPdntcQ").metadata().await.unwrap();
-innertube.video("dQw4w9WgXcQ").metadata().await.unwrap();
-innertube.playlist_metadata("PLFPk5ONFpYvWsnAYJqm6Li4qtg367uUbv").await.unwrap();
+let target = innertube.channel("UCBR8-60-B28hp2BmDPdntcQ");
+target.metadata().await?;
+target.share_links().await?;
+target.title().await?;
 ```
