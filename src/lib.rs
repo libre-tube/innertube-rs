@@ -1,7 +1,8 @@
-use std::{fmt::Debug, str::FromStr, sync::OnceLock};
+use std::{fmt::Debug, str::FromStr};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use isahc::AsyncReadResponseExt;
+use itertools::Itertools;
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 
@@ -26,12 +27,9 @@ const YT_BROWSE_ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/browse";
 const YT_PLAYER_ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/player";
 const YT_SHARE_ENDPOINT: &str = "https://www.youtube.com/youtubei/v1/share/get_share_panel";
 
-mod paths;
 mod tools;
 mod types;
 pub use types::*;
-
-type ProtobufRaw = &'static [u8];
 
 #[derive(thiserror::Error, Debug)]
 pub enum InnertubeError {
@@ -58,7 +56,12 @@ pub struct Innertube {
 }
 
 impl Innertube {
-    async fn req(&self, url: &str, mut payload: serde_json::Value) -> InnertubeResult<Value> {
+    async fn req<T: TryFrom<Vec<Value>>>(
+        &self,
+        url: &str,
+        mut payload: serde_json::Value,
+        get: &[&'static str],
+    ) -> InnertubeResult<T> {
         let mut json = serde_json::from_str::<serde_json::Value>(CONTEXT_DEFAULT).unwrap();
         tools::append(&mut payload, &mut json);
 
@@ -66,7 +69,18 @@ impl Innertube {
         let text = resp.text().await?;
 
         if resp.status().is_success() {
-            Ok(serde_json::from_str(&text)?)
+            let buf_parsed: Value = serde_json::from_str(&text)?;
+
+            let (successes, failures): (Vec<Value>, Vec<String>) = get
+                .iter()
+                .map(|path| tools::json(path, &buf_parsed).map_err(|_| path.to_string()))
+                .partition_result();
+
+            if failures.is_empty() {
+                Ok(successes.try_into().unwrap_or_else(|_| panic!()))
+            } else {
+                Err(InnertubeError::NotFoundInJSON(failures))
+            }
         } else {
             Err(InnertubeError::Http {
                 status_code: resp.status(),
@@ -75,11 +89,21 @@ impl Innertube {
         }
     }
 
-    async fn req_share_links(
+    async fn req_single<D: DeserializeOwned>(
         &self,
-        protobuf_raw: ProtobufRaw,
+        url: &str,
+        payload: serde_json::Value,
+        get: &'static str,
+    ) -> InnertubeResult<D> {
+        let [value] = self.req::<[Value; 1]>(url, payload, &[get]).await?;
+        Ok(serde_json::from_value(value)?)
+    }
+
+    async fn get_title_from_share(
+        &self,
+        protobuf_raw: &[u8],
         value: &str,
-    ) -> InnertubeResult<ShareLinks> {
+    ) -> InnertubeResult<String> {
         let protobuf_with_value = protobuf_raw.iter().fold(Vec::new(), |mut acc, ch| {
             acc.append(&mut {
                 match *ch {
@@ -91,22 +115,32 @@ impl Innertube {
             acc
         });
 
-        let json = self.req(
+        let social_networks = self
+            .req_single::<Vec<Value>>(
                 YT_SHARE_ENDPOINT,
                 json!({ "serializedSharedEntity": urlencoding::encode(&STANDARD.encode(protobuf_with_value)) }),
-            ).await?;
-        Ok(ShareLinks::new(
-            tools::json(paths::SHARE_TARGETS_ARRAY, &json)?
-                .as_array()
-                .unwrap()
-                .iter()
-                .filter_map(|share_target| {
-                    tools::json(paths::SHARE_TARGET_URL, share_target)
-                        .ok()
-                        .and_then(|url_| url_.as_str().and_then(|s| url::Url::from_str(s).ok()))
-                })
-                .collect(),
-        ))
+                "actions.0.openPopupAction.popup.unifiedSharePanelRenderer.contents.0.thirdPartyNetworkSection.shareTargetContainer.thirdPartyShareTargetSectionRenderer.shareTargets",
+            )
+            .await?;
+
+        for entry in social_networks {
+            let Some(url) = tools::json(
+                "shareTargetRenderer.navigationEndpoint.urlEndpoint.url",
+                &entry,
+            )
+            .ok()
+            .and_then(|v| v.as_str().and_then(|s| url::Url::from_str(s).ok())) else {
+                continue;
+            };
+
+            if let Some((_, title)) = url.query_pairs().find(|(k, _)| k == "title") {
+                return Ok(title.to_string());
+            }
+        }
+
+        Err(InnertubeError::NotFoundInJSON(vec![
+            "share url that contains the `title` parameter".to_string(),
+        ]))
     }
 
     /// Create a new Innertube instance
@@ -123,149 +157,86 @@ impl Innertube {
         Ok(Innertube { client })
     }
 
-    pub fn channel<S: ToString>(&self, channel_id: S) -> InnertubeReq<'_, ChannelMetadata> {
-        let channel_id = channel_id.to_string();
-
-        InnertubeReq {
-            it: self,
-            id: channel_id.clone(),
-            metadata_endpoint: YT_BROWSE_ENDPOINT,
-            metadata_payload: json!({ "browseId": channel_id }),
-            metadata_parser: Box::new(|value| tools::json(paths::CHANNEL_METADATA, &value)),
-            metadata_cached: OnceLock::new(),
-            share_links_payload: b"\x1a?V",
-            share_links_cached: OnceLock::new(),
-        }
+    /// Get channel metadata with specified `channel_id`
+    pub async fn channel_metadata(&self, channel_id: &str) -> InnertubeResult<ChannelMetadata> {
+        self.req_single(
+            YT_BROWSE_ENDPOINT,
+            json!({ "browseId": channel_id }),
+            "metadata.channelMetadataRenderer",
+        )
+        .await
     }
 
-    pub fn video<S: ToString>(&self, video_id: S) -> InnertubeReq<'_, VideoMetadata> {
-        let video_id = video_id.to_string();
-
-        InnertubeReq {
-            it: self,
-            id: video_id.to_string(),
-            metadata_endpoint: YT_PLAYER_ENDPOINT,
-            metadata_payload: json!({ "videoId": video_id }),
-            metadata_parser: Box::new(|value| tools::json(paths::VIDEO_METADATA, &value)),
-            metadata_cached: OnceLock::new(),
-            share_links_payload: b"\n?V\xa0\x01\x01",
-            share_links_cached: OnceLock::new(),
-        }
+    /// Get channel title with specified `channel_id` (way faster than `channel_metadata`)
+    pub async fn channel_title(&self, channel_id: &str) -> InnertubeResult<String> {
+        self.get_title_from_share(b"\x1a?V", channel_id).await
     }
 
-    pub fn playlist<S: ToString>(&self, playlist_id: S) -> InnertubeReq<'_, PlaylistMetadata> {
-        let playlist_id = playlist_id.to_string();
-
-        InnertubeReq {
-            it: self,
-            id: playlist_id.to_string(),
-            metadata_endpoint: YT_BROWSE_ENDPOINT,
-            metadata_payload: json!({ "browseId": String::from("VL")+&playlist_id }),
-            metadata_parser: Box::new(|value| {
-                let mut playlist_metadata = tools::json(paths::PLAYLIST_METADATA, &value)?;
-                let thumbnail = tools::json(paths::PLAYLIST_THUMBNAIL, &value)?;
-                let additional_info = tools::json(paths::PLAYLIST_ADDITIONAL_METADATA, &value)?;
-
-                let mut additional_info = additional_info.as_array().unwrap().iter().map(|value| {
-                    tools::json("text.content", value)
-                        .unwrap()
-                        .as_str()
-                        .unwrap()
-                        .to_string()
-                });
-
-                // e.g. ["Playlist", "102 videos", "100,102 views"] -> [102_usize, 100102_usize]
-                let [video_count, view_count] = ["video", "view"]
-                    .iter()
-                    .filter_map(|pat| {
-                        additional_info.find(|x| x.contains(pat)).and_then(|raw| {
-                            raw.split_once(" ")
-                                .and_then(|split| split.0.replace(',', "").parse::<usize>().ok())
-                        })
-                    })
-                    .collect::<Vec<usize>>()
-                    .try_into()
-                    .unwrap();
-
-                tools::append(
-                    &mut json!({"videoCount": video_count, "viewCount": view_count}),
-                    &mut playlist_metadata,
-                );
-                tools::append(
-                    &mut json!({"thumbnail": {"thumbnails": thumbnail}}),
-                    &mut playlist_metadata,
-                );
-
-                Ok(playlist_metadata)
-            }),
-            metadata_cached: OnceLock::new(),
-            share_links_payload: b"\x12?V",
-            share_links_cached: OnceLock::new(),
-        }
-    }
-}
-
-pub struct InnertubeReq<'it, T: DeserializeOwned> {
-    it: &'it Innertube,
-    id: String,
-    metadata_endpoint: &'static str,
-    metadata_payload: Value,
-    metadata_parser: Box<dyn Fn(Value) -> InnertubeResult<Value> + Sync>,
-    metadata_cached: OnceLock<T>,
-    share_links_payload: ProtobufRaw,
-    share_links_cached: OnceLock<ShareLinks>,
-}
-
-unsafe impl<'it, T: DeserializeOwned> Send for InnertubeReq<'it, T> {}
-
-impl<'it, T: DeserializeOwned> InnertubeReq<'it, T> {
-    async fn req_share_links(&self) -> InnertubeResult<&ShareLinks> {
-        Ok(if let Some(share_links) = self.share_links_cached.get() {
-            share_links
-        } else {
-            let resp = self
-                .it
-                .req_share_links(self.share_links_payload, &self.id)
-                .await?;
-            self.share_links_cached.get_or_init(|| resp)
-        })
+    /// Get video metadata with specified `video_id`
+    pub async fn video_metadata(&self, video_id: &str) -> InnertubeResult<VideoMetadata> {
+        self.req_single(
+            YT_PLAYER_ENDPOINT,
+            json!({ "videoId": video_id }),
+            "videoDetails",
+        )
+        .await
     }
 
-    async fn req_metadata(&self) -> InnertubeResult<&T> {
-        Ok(if let Some(metadata_cached) = self.metadata_cached.get() {
-            metadata_cached
-        } else {
-            let resp = self
-                .it
-                .req(self.metadata_endpoint, self.metadata_payload.clone())
-                .await?;
-            let parser = &self.metadata_parser;
-            let metadata = serde_json::from_value(parser(resp)?)?;
-            self.metadata_cached.get_or_init(|| metadata)
-        })
+    /// Get channel title with specified `video_id` (way faster than `video_metadata`)
+    pub async fn video_title(&self, video_id: &str) -> InnertubeResult<String> {
+        self.get_title_from_share(b"\n?V\xa0\x01\x01", video_id)
+            .await
     }
 
-    pub async fn metadata(&self) -> InnertubeResult<&T> {
-        Ok(self.req_metadata().await?)
+    /// Get video metadata with specified `playlist_id`
+    pub async fn playlist_metadata(&self, playlist_id: &str) -> InnertubeResult<PlaylistMetadata> {
+        let [mut playlist_metadata, additional_info, thumbnail] = self
+            .req(
+                YT_BROWSE_ENDPOINT,
+                json!({ "browseId": String::from("VL")+playlist_id}),
+                &[
+                    "metadata.playlistMetadataRenderer",
+                    "header.pageHeaderRenderer.content.pageHeaderViewModel.metadata.contentMetadataViewModel.metadataRows.1.metadataParts",
+                    "contents.twoColumnBrowseResultsRenderer.tabs.0.tabRenderer.content.sectionListRenderer.contents.0.itemSectionRenderer.contents.0.lockupViewModel.contentImage.thumbnailViewModel.image.sources"
+                ],
+            )
+            .await?;
+
+        let mut additional_info = additional_info.as_array().unwrap().iter().map(|value| {
+            tools::json("text.content", value)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string()
+        });
+
+        // e.g. ["Playlist", "102 videos", "100,102 views"] -> [102_usize, 100102_usize]
+        let [video_count, view_count] = ["video", "view"]
+            .iter()
+            .filter_map(|pat| {
+                additional_info.find(|x| x.contains(pat)).and_then(|raw| {
+                    raw.split_once(" ")
+                        .and_then(|split| split.0.replace(',', "").parse::<usize>().ok())
+                })
+            })
+            .collect::<Vec<usize>>()
+            .try_into()
+            .unwrap();
+
+        tools::append(
+            &mut json!({"videoCount": video_count, "viewCount": view_count}),
+            &mut playlist_metadata,
+        );
+        tools::append(
+            &mut json!({"thumbnail": {"thumbnails": thumbnail}}),
+            &mut playlist_metadata,
+        );
+
+        Ok(serde_json::from_value(playlist_metadata.to_owned())?)
     }
 
-    pub async fn share_links(&self) -> InnertubeResult<&ShareLinks> {
-        Ok(self.req_share_links().await?)
-    }
-
-    pub fn id(&self) -> &str {
-        &self.id
-    }
-
-    pub async fn title(&self) -> InnertubeResult<Option<String>> {
-        Ok(self
-            .req_share_links()
-            .await?
-            .find("www.linkedin.com")
-            .and_then(|lt| {
-                lt.query_pairs()
-                    .find(|(key, _)| key == "title")
-                    .map(|(_, val)| val.to_string())
-            }))
+    /// Get playlist title with specified `playlist_id` (way faster than `playlist_metadata`)
+    pub async fn playlist_title(&self, playlist_id: &str) -> InnertubeResult<String> {
+        self.get_title_from_share(b"\x12?V", playlist_id).await
     }
 }

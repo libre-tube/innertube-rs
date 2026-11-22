@@ -8,10 +8,8 @@ const INNERTUBE: LazyLock<Innertube> = LazyLock::new(|| Innertube::new().unwrap(
 async fn channel_title() {
     assert_eq!(
         &INNERTUBE
-            .channel("UCBR8-60-B28hp2BmDPdntcQ")
-            .title()
+            .channel_title("UCBR8-60-B28hp2BmDPdntcQ")
             .await
-            .unwrap()
             .unwrap(),
         "YouTube"
     );
@@ -20,12 +18,7 @@ async fn channel_title() {
 #[tokio::test]
 async fn video_title() {
     assert_eq!(
-        INNERTUBE
-            .video("dQw4w9WgXcQ")
-            .title()
-            .await
-            .unwrap()
-            .unwrap(),
+        &INNERTUBE.video_title("dQw4w9WgXcQ").await.unwrap(),
         "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)"
     );
 }
@@ -34,10 +27,8 @@ async fn video_title() {
 async fn playlist_title() {
     assert_eq!(
         &INNERTUBE
-            .playlist("PLTTUULw3bjATzc86JscVaBHy-O_d_1Ibh")
-            .title()
+            .playlist_title("PLTTUULw3bjATzc86JscVaBHy-O_d_1Ibh")
             .await
-            .unwrap()
             .unwrap(),
         "Installing Arch Linux every day until I find a girlfriend"
     );
@@ -46,23 +37,16 @@ async fn playlist_title() {
 #[tokio::test]
 async fn channel_metadata() {
     let metadata = INNERTUBE
-        .channel("UCBR8-60-B28hp2BmDPdntcQ")
-        .metadata()
+        .channel_metadata("UCBR8-60-B28hp2BmDPdntcQ")
         .await
-        .unwrap()
-        .to_owned();
+        .unwrap();
     assert_eq!(&metadata.title, "YouTube");
     assert_eq!(&metadata.description, "YouTube's official YouTube channel");
 }
 
 #[tokio::test]
 async fn video_metadata() {
-    let metadata = INNERTUBE
-        .video("dQw4w9WgXcQ")
-        .metadata()
-        .await
-        .unwrap()
-        .to_owned();
+    let metadata = INNERTUBE.video_metadata("dQw4w9WgXcQ").await.unwrap();
     assert_eq!(
         &metadata.title,
         "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)"
@@ -90,11 +74,9 @@ async fn video_metadata() {
 #[tokio::test]
 async fn playlist_metadata() {
     let metadata = INNERTUBE
-        .playlist("PLFPk5ONFpYvWsnAYJqm6Li4qtg367uUbv")
-        .metadata()
+        .playlist_metadata("PLFPk5ONFpYvWsnAYJqm6Li4qtg367uUbv")
         .await
-        .unwrap()
-        .to_owned();
+        .unwrap();
     assert_eq!(
         &metadata.title,
         "Rickroll Playlist(Never Gonna Give you Up)"
@@ -122,8 +104,6 @@ async fn playlist_metadata() {
 
 #[tokio::test]
 async fn video_metadata_multiple() {
-    let it = INNERTUBE;
-
     for video_id in [
         "Ge_qSvD8-1o",
         "usXhiWE2Uc0",
@@ -131,16 +111,13 @@ async fn video_metadata_multiple() {
         "5MIsMbFjvkw",
         "aoag03mSuXQ",
     ] {
-        let target = it.video(video_id);
-        target.title().await.unwrap().unwrap();
-        target.metadata().await.unwrap();
+        INNERTUBE.video_title(video_id).await.unwrap();
+        INNERTUBE.video_metadata(video_id).await.unwrap();
     }
 }
 
 #[tokio::test]
 async fn channel_metadata_multiple() {
-    let it = INNERTUBE;
-
     for channel_id in [
         "UCNCktfoFAXtXnMlhjyc9SPA",
         "UCJ6td3C9QlPO9O_J5dF4ZzA",
@@ -148,15 +125,12 @@ async fn channel_metadata_multiple() {
         "UCEbYhDd6c6vngsF5PQpFVWg",
         "UCHnyfMqiRRG1u-2MsSQLbXA",
     ] {
-        let target = it.channel(channel_id);
-        target.title().await.unwrap().unwrap();
-        target.metadata().await.unwrap();
+        INNERTUBE.channel_title(channel_id).await.unwrap();
+        INNERTUBE.channel_metadata(channel_id).await.unwrap();
     }
 }
 #[tokio::test]
 async fn playlist_metadata_multiple() {
-    let it = INNERTUBE;
-
     for playlist_id in [
         "PLX0oFSIlwhPY",
         "PLUeQUfurHN6ZdGRI7tmCF-Oxgs1ptlU3U",
@@ -164,8 +138,7 @@ async fn playlist_metadata_multiple() {
         "PLTTUULw3bjATzc86JscVaBHy-O_d_1Ibh",
         "PLu94B0pepV1O78Yi_wlOm3-H-cJxROWVf",
     ] {
-        let target = it.playlist(playlist_id);
-        target.title().await.unwrap().unwrap();
-        target.metadata().await.unwrap();
+        INNERTUBE.playlist_title(playlist_id).await.unwrap();
+        INNERTUBE.playlist_metadata(playlist_id).await.unwrap();
     }
 }
