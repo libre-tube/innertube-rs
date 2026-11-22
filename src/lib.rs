@@ -77,7 +77,7 @@ impl Innertube {
 
     async fn req_share_links(
         &self,
-        protobuf_raw: &[u8],
+        protobuf_raw: ProtobufRaw,
         value: &str,
     ) -> InnertubeResult<ShareLinks> {
         let protobuf_with_value = protobuf_raw.iter().fold(Vec::new(), |mut acc, ch| {
