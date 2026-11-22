@@ -132,9 +132,9 @@ impl Innertube {
             metadata_endpoint: YT_BROWSE_ENDPOINT,
             metadata_payload: json!({ "browseId": channel_id }),
             metadata_parser: Box::new(|value| tools::json(paths::CHANNEL_METADATA, &value)),
+            metadata_cached: OnceLock::new(),
             share_links_payload: b"\x1a?V",
             share_links_cached: OnceLock::new(),
-            _marker: PhantomData,
         }
     }
 
@@ -147,9 +147,9 @@ impl Innertube {
             metadata_endpoint: YT_PLAYER_ENDPOINT,
             metadata_payload: json!({ "videoId": video_id }),
             metadata_parser: Box::new(|value| tools::json(paths::VIDEO_METADATA, &value)),
+            metadata_cached: OnceLock::new(),
             share_links_payload: b"\n?V\xa0\x01\x01",
             share_links_cached: OnceLock::new(),
-            _marker: PhantomData,
         }
     }
 
@@ -198,9 +198,9 @@ impl Innertube {
 
                 Ok(playlist_metadata)
             }),
+            metadata_cached: OnceLock::new(),
             share_links_payload: b"\x12?V",
             share_links_cached: OnceLock::new(),
-            _marker: PhantomData,
         }
     }
 }
@@ -211,9 +211,9 @@ pub struct InnertubeReq<'it, T: DeserializeOwned> {
     metadata_endpoint: &'static str,
     metadata_payload: Value,
     metadata_parser: Box<dyn Fn(Value) -> InnertubeResult<Value> + Sync>,
+    metadata_cached: OnceLock<T>,
     share_links_payload: ProtobufRaw,
     share_links_cached: OnceLock<ShareLinks>,
-    _marker: PhantomData<T>,
 }
 
 unsafe impl<'it, T: DeserializeOwned> Send for InnertubeReq<'it, T> {}
@@ -231,21 +231,30 @@ impl<'it, T: DeserializeOwned> InnertubeReq<'it, T> {
         })
     }
 
-    pub async fn metadata(&self) -> InnertubeResult<T> {
-        let resp = self
-            .it
-            .req(self.metadata_endpoint, self.metadata_payload.clone())
-            .await?;
-        let parser = &self.metadata_parser;
-        Ok(serde_json::from_value(parser(resp)?)?)
+    async fn req_metadata(&self) -> InnertubeResult<&T> {
+        Ok(if let Some(metadata_cached) = self.metadata_cached.get() {
+            metadata_cached
+        } else {
+            let resp = self
+                .it
+                .req(self.metadata_endpoint, self.metadata_payload.clone())
+                .await?;
+            let parser = &self.metadata_parser;
+            let metadata = serde_json::from_value(parser(resp)?)?;
+            self.metadata_cached.get_or_init(|| metadata)
+        })
     }
 
-    pub async fn share_links(&self) -> InnertubeResult<ShareLinks> {
-        Ok(self.req_share_links().await?.to_owned())
+    pub async fn metadata(&self) -> InnertubeResult<&T> {
+        Ok(self.req_metadata().await?)
     }
 
-    pub async fn id(&self) -> String {
-        self.id.to_string()
+    pub async fn share_links(&self) -> InnertubeResult<&ShareLinks> {
+        Ok(self.req_share_links().await?)
+    }
+
+    pub async fn id(&self) -> &str {
+        &self.id
     }
 
     pub async fn title(&self) -> InnertubeResult<Option<String>> {
