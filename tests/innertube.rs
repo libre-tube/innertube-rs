@@ -20,7 +20,7 @@ async fn channel_title() {
 #[tokio::test]
 async fn video_title() {
     assert_eq!(
-        &INNERTUBE
+        INNERTUBE
             .video("dQw4w9WgXcQ")
             .title()
             .await
@@ -49,14 +49,20 @@ async fn channel_metadata() {
         .channel("UCBR8-60-B28hp2BmDPdntcQ")
         .metadata()
         .await
-        .unwrap();
+        .unwrap()
+        .to_owned();
     assert_eq!(&metadata.title, "YouTube");
     assert_eq!(&metadata.description, "YouTube's official YouTube channel");
 }
 
 #[tokio::test]
 async fn video_metadata() {
-    let metadata = INNERTUBE.video("dQw4w9WgXcQ").metadata().await.unwrap();
+    let metadata = INNERTUBE
+        .video("dQw4w9WgXcQ")
+        .metadata()
+        .await
+        .unwrap()
+        .to_owned();
     assert_eq!(
         &metadata.title,
         "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)"
@@ -87,7 +93,8 @@ async fn playlist_metadata() {
         .playlist("PLFPk5ONFpYvWsnAYJqm6Li4qtg367uUbv")
         .metadata()
         .await
-        .unwrap();
+        .unwrap()
+        .to_owned();
     assert_eq!(
         &metadata.title,
         "Rickroll Playlist(Never Gonna Give you Up)"

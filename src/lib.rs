@@ -1,4 +1,4 @@
-use std::{fmt::Debug, marker::PhantomData, str::FromStr, sync::OnceLock};
+use std::{fmt::Debug, str::FromStr, sync::OnceLock};
 
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use isahc::AsyncReadResponseExt;
