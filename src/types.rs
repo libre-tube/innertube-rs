@@ -92,3 +92,16 @@ impl Thumbnails {
 
 /// List of countries in `ISO 639-1` format
 pub type Countries = Vec<String>;
+
+#[derive(Debug, Clone)]
+pub struct ShareLinks(pub Vec<url::Url>);
+
+impl ShareLinks {
+    pub fn new(urls: Vec<url::Url>) -> Self {
+        Self(urls)
+    }
+
+    pub fn find(&self, host: &str) -> Option<&url::Url> {
+        self.0.iter().find(|url| url.host_str() == Some(host))
+    }
+}

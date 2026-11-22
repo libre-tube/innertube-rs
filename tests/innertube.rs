@@ -8,8 +8,10 @@ const INNERTUBE: LazyLock<Innertube> = LazyLock::new(|| Innertube::new().unwrap(
 async fn channel_title() {
     assert_eq!(
         &INNERTUBE
-            .channel_title("UCBR8-60-B28hp2BmDPdntcQ")
+            .channel("UCBR8-60-B28hp2BmDPdntcQ")
+            .title()
             .await
+            .unwrap()
             .unwrap(),
         "YouTube"
     );
@@ -18,7 +20,12 @@ async fn channel_title() {
 #[tokio::test]
 async fn video_title() {
     assert_eq!(
-        &INNERTUBE.video_title("dQw4w9WgXcQ").await.unwrap(),
+        &INNERTUBE
+            .video("dQw4w9WgXcQ")
+            .title()
+            .await
+            .unwrap()
+            .unwrap(),
         "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)"
     );
 }
@@ -27,8 +34,10 @@ async fn video_title() {
 async fn playlist_title() {
     assert_eq!(
         &INNERTUBE
-            .playlist_title("PLTTUULw3bjATzc86JscVaBHy-O_d_1Ibh")
+            .playlist("PLTTUULw3bjATzc86JscVaBHy-O_d_1Ibh")
+            .title()
             .await
+            .unwrap()
             .unwrap(),
         "Installing Arch Linux every day until I find a girlfriend"
     );
@@ -37,7 +46,8 @@ async fn playlist_title() {
 #[tokio::test]
 async fn channel_metadata() {
     let metadata = INNERTUBE
-        .channel_metadata("UCBR8-60-B28hp2BmDPdntcQ")
+        .channel("UCBR8-60-B28hp2BmDPdntcQ")
+        .metadata()
         .await
         .unwrap();
     assert_eq!(&metadata.title, "YouTube");
@@ -46,7 +56,7 @@ async fn channel_metadata() {
 
 #[tokio::test]
 async fn video_metadata() {
-    let metadata = INNERTUBE.video_metadata("dQw4w9WgXcQ").await.unwrap();
+    let metadata = INNERTUBE.video("dQw4w9WgXcQ").metadata().await.unwrap();
     assert_eq!(
         &metadata.title,
         "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)"
@@ -74,7 +84,8 @@ async fn video_metadata() {
 #[tokio::test]
 async fn playlist_metadata() {
     let metadata = INNERTUBE
-        .playlist_metadata("PLFPk5ONFpYvWsnAYJqm6Li4qtg367uUbv")
+        .playlist("PLFPk5ONFpYvWsnAYJqm6Li4qtg367uUbv")
+        .metadata()
         .await
         .unwrap();
     assert_eq!(
@@ -104,6 +115,8 @@ async fn playlist_metadata() {
 
 #[tokio::test]
 async fn video_metadata_multiple() {
+    let it = INNERTUBE;
+
     for video_id in [
         "Ge_qSvD8-1o",
         "usXhiWE2Uc0",
@@ -111,13 +124,16 @@ async fn video_metadata_multiple() {
         "5MIsMbFjvkw",
         "aoag03mSuXQ",
     ] {
-        INNERTUBE.video_title(video_id).await.unwrap();
-        INNERTUBE.video_metadata(video_id).await.unwrap();
+        let target = it.video(video_id);
+        target.title().await.unwrap().unwrap();
+        target.metadata().await.unwrap();
     }
 }
 
 #[tokio::test]
 async fn channel_metadata_multiple() {
+    let it = INNERTUBE;
+
     for channel_id in [
         "UCNCktfoFAXtXnMlhjyc9SPA",
         "UCJ6td3C9QlPO9O_J5dF4ZzA",
@@ -125,12 +141,15 @@ async fn channel_metadata_multiple() {
         "UCEbYhDd6c6vngsF5PQpFVWg",
         "UCHnyfMqiRRG1u-2MsSQLbXA",
     ] {
-        INNERTUBE.channel_title(channel_id).await.unwrap();
-        INNERTUBE.channel_metadata(channel_id).await.unwrap();
+        let target = it.channel(channel_id);
+        target.title().await.unwrap().unwrap();
+        target.metadata().await.unwrap();
     }
 }
 #[tokio::test]
 async fn playlist_metadata_multiple() {
+    let it = INNERTUBE;
+
     for playlist_id in [
         "PLX0oFSIlwhPY",
         "PLUeQUfurHN6ZdGRI7tmCF-Oxgs1ptlU3U",
@@ -138,7 +157,8 @@ async fn playlist_metadata_multiple() {
         "PLTTUULw3bjATzc86JscVaBHy-O_d_1Ibh",
         "PLu94B0pepV1O78Yi_wlOm3-H-cJxROWVf",
     ] {
-        INNERTUBE.playlist_title(playlist_id).await.unwrap();
-        INNERTUBE.playlist_metadata(playlist_id).await.unwrap();
+        let target = it.playlist(playlist_id);
+        target.title().await.unwrap().unwrap();
+        target.metadata().await.unwrap();
     }
 }
