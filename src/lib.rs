@@ -253,7 +253,7 @@ impl<'it, T: DeserializeOwned> InnertubeReq<'it, T> {
         Ok(self.req_share_links().await?)
     }
 
-    pub async fn id(&self) -> &str {
+    pub fn id(&self) -> &str {
         &self.id
     }
 
